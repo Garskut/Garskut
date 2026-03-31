@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 import json
 import os
 import uuid
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from urllib import error as url_error
+from urllib import parse as url_parse
+from urllib import request as url_request
 
 try:
     from anthropic import Anthropic
@@ -15,6 +18,7 @@ else:
     _ANTHROPIC_IMPORT_ERROR = None
 
 DEFAULT_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-20241022")
+API_TIMEOUT_SECONDS = 10
 
 
 @dataclass
@@ -101,6 +105,55 @@ class ClaudeSDKAgent:
 
 def _extract_text(content: Iterable[Any]) -> str:
     return "".join(item.text for item in content if getattr(item, "type", None) == "text")
+
+
+def _build_url(base_url: str, endpoint: str) -> str:
+    base = base_url.rstrip("/") + "/"
+    return url_parse.urljoin(base, endpoint.lstrip("/"))
+
+
+def _clean_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in params.items() if value is not None}
+
+
+def _resolve_api_config(
+    payload: Dict[str, Any],
+    env_prefix: str,
+    default_base_url: Optional[str],
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    base_url = payload.get("base_url") or os.getenv(f"{env_prefix}_API_BASE_URL") or default_base_url
+    api_key = payload.get("api_key") or os.getenv(f"{env_prefix}_API_KEY")
+    api_host = payload.get("api_host") or os.getenv(f"{env_prefix}_API_HOST")
+    return base_url, api_key, api_host
+
+
+def _call_json_api(
+    base_url: str,
+    endpoint: str,
+    params: Dict[str, Any],
+    headers: Dict[str, str],
+) -> Dict[str, Any]:
+    url = _build_url(base_url, endpoint)
+    query = url_parse.urlencode(_clean_params(params))
+    if query:
+        url = f"{url}?{query}"
+    request_obj = url_request.Request(url, headers=headers, method="GET")
+    try:
+        with url_request.urlopen(request_obj, timeout=API_TIMEOUT_SECONDS) as response:
+            body = response.read().decode("utf-8")
+            data = json.loads(body) if body else {}
+            return {"data": data, "status": response.status}
+    except url_error.HTTPError as exc:
+        body = exc.read().decode("utf-8") if exc.fp else ""
+        return {
+            "error": "HTTPError from API",
+            "status": exc.code,
+            "details": body,
+        }
+    except url_error.URLError as exc:
+        return {"error": "Connection error when calling API", "details": str(exc.reason)}
+    except json.JSONDecodeError:
+        return {"error": "API response was not valid JSON"}
 
 
 @dataclass
@@ -191,6 +244,31 @@ class PersonalTrainerTools:
             "unknown_items": [item for item in unknown_items if item],
         }
 
+    def search_fatsecret_foods(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        base_url, api_key, api_host = _resolve_api_config(
+            payload,
+            "FATSECRET",
+            os.getenv("FATSECRET_API_BASE_URL", "https://fatsecret.p.rapidapi.com"),
+        )
+        if not base_url or not api_key or not api_host:
+            return {
+                "error": "Missing FatSecret API configuration",
+                "required_env": ["FATSECRET_API_KEY", "FATSECRET_API_HOST"],
+            }
+        endpoint = payload.get("endpoint") or "/foods/search"
+        params = {
+            "query": payload.get("query"),
+            "page": payload.get("page"),
+            "max_results": payload.get("max_results"),
+        }
+        headers = {
+            "X-RapidAPI-Key": api_key,
+            "X-RapidAPI-Host": api_host,
+        }
+        response = _call_json_api(base_url, endpoint, params, headers)
+        response["source"] = "fatsecret"
+        return response
+
     def estimate_daily_calorie_target(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         weight = float(payload.get("weight_kg", 0))
         height = float(payload.get("height_cm", 0))
@@ -220,6 +298,28 @@ class PersonalTrainerTools:
             "daily_calorie_target": round(target),
             "goal": goal,
         }
+
+    def fetch_bmi_from_health_api(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        base_url, api_key, api_host = _resolve_api_config(payload, "HEALTH", None)
+        if not base_url or not api_key or not api_host:
+            return {
+                "error": "Missing Health API configuration",
+                "required_env": ["HEALTH_API_BASE_URL", "HEALTH_API_KEY", "HEALTH_API_HOST"],
+            }
+        endpoint = payload.get("endpoint") or "/bmi"
+        params = payload.get("params") or {
+            "height_cm": payload.get("height_cm"),
+            "weight_kg": payload.get("weight_kg"),
+            "age": payload.get("age"),
+            "sex": payload.get("sex"),
+        }
+        headers = {
+            "X-RapidAPI-Key": api_key,
+            "X-RapidAPI-Host": api_host,
+        }
+        response = _call_json_api(base_url, endpoint, params, headers)
+        response["source"] = "health_api"
+        return response
 
     def recommend_cultural_meals(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         country = (payload.get("country") or "global").lower()
@@ -287,6 +387,44 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
         },
         handler=tools.estimate_daily_calorie_target,
     )
+    fatsecret_search_tool = ToolSpec(
+        name="search_fatsecret_foods",
+        description="Search the FatSecret food database via RapidAPI.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "page": {"type": "integer"},
+                "max_results": {"type": "integer"},
+                "endpoint": {"type": "string"},
+                "base_url": {"type": "string"},
+                "api_key": {"type": "string"},
+                "api_host": {"type": "string"},
+            },
+            "required": ["query"],
+        },
+        handler=tools.search_fatsecret_foods,
+    )
+    health_bmi_tool = ToolSpec(
+        name="fetch_bmi_from_health_api",
+        description="Fetch BMI details from a health API via RapidAPI.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "height_cm": {"type": "number"},
+                "weight_kg": {"type": "number"},
+                "age": {"type": "integer"},
+                "sex": {"type": "string"},
+                "endpoint": {"type": "string"},
+                "base_url": {"type": "string"},
+                "api_key": {"type": "string"},
+                "api_host": {"type": "string"},
+                "params": {"type": "object"},
+            },
+            "required": ["height_cm", "weight_kg"],
+        },
+        handler=tools.fetch_bmi_from_health_api,
+    )
 
     trainer_tools = ToolRegistry(
         [
@@ -346,6 +484,7 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
                 },
                 handler=tools.estimate_meal_calories,
             ),
+            fatsecret_search_tool,
             calorie_target_tool,
             ToolSpec(
                 name="recommend_cultural_meals",
@@ -365,6 +504,7 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
 
     mcp_tools = ToolRegistry(
         [
+            fatsecret_search_tool,
             ToolSpec(
                 name="calculate_bmi",
                 description="Calculate BMI and category.",
@@ -393,6 +533,7 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
                 },
                 handler=tools.schedule_workout_reminder,
             ),
+            health_bmi_tool,
             calorie_target_tool,
         ]
     )
@@ -416,7 +557,9 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
             "Use estimate_meal_calories to report calories per meal and total. Use "
             "estimate_daily_calorie_target for bulking/cutting goals and "
             "recommend_cultural_meals to suggest foods based on the customer’s country "
-            "(e.g., Malaysia -> nasi lemak or nasi lemak merah)."
+            "(e.g., Malaysia -> nasi lemak or nasi lemak merah). Use "
+            "search_fatsecret_foods when you need detailed nutrition data from the "
+            "FatSecret database."
         ),
         tool_registry=nutritionist_tools,
     )
@@ -425,9 +568,11 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
         name="Agent 3 - MCP Tool Agent",
         system_prompt=(
             "You are Agent 3, an MCP tool agent that connects tools to help customers "
-            "reach their goals. Use calculate_bmi for BMI insights, "
+            "reach their goals. Use calculate_bmi for BMI insights or "
+            "fetch_bmi_from_health_api when configured, "
             "schedule_workout_reminder for Google Calendar-style reminders, and "
-            "estimate_daily_calorie_target to align nutrition goals."
+            "estimate_daily_calorie_target to align nutrition goals. Use "
+            "search_fatsecret_foods if you need nutrition context data."
         ),
         tool_registry=mcp_tools,
     )

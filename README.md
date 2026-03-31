@@ -69,3 +69,8 @@ To run the agents, install the Claude SDK and set `ANTHROPIC_API_KEY`:
 ```bash
 pip install anthropic
 ```
+
+Optional API integrations (RapidAPI):
+
+- `FATSECRET_API_KEY`, `FATSECRET_API_HOST`, `FATSECRET_API_BASE_URL` for FatSecret food search.
+- `HEALTH_API_KEY`, `HEALTH_API_HOST`, `HEALTH_API_BASE_URL` for BMI/health calculators.
