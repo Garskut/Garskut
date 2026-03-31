@@ -56,16 +56,3 @@ I am also passionate about AI agents, i have been created multi orchrestation ag
 <p align="left"> <a href="https://discord.com/users/tatum" target="_blank" rel="noreferrer"> <picture> <source media="(prefers-color-scheme: dark)" srcset="undefined" /> <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/discord.svg" /> <img src="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/discord.svg" width="32" height="32" /> </picture> </a> <a href="https://www.github.com/Garskut" target="_blank" rel="noreferrer"> <picture> <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/github-dark.svg" /> <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/github.svg" /> <img src="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/github.svg" width="32" height="32" /> </picture> </a> <a href="http://www.instagram.com/tegarinsaan" target="_blank" rel="noreferrer"> <picture> <source media="(prefers-color-scheme: dark)" srcset="undefined" /> <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/instagram.svg" /> <img src="https://raw.githubusercontent.com/danielcranney/readme-generator/main/public/icons/socials/instagram.svg" width="32" height="32" /> </picture> </a></p>
 
 
-### Personal Trainer Agents (Claude SDK)
-
-This repo now includes a minimal multi-agent setup for a personal trainer workflow. The agents live in `personal_trainer_agents.py` and include:
-
-- **Agent 1**: Personal trainer consultation intake (weight, meals, exercise, grievance, goals).
-- **Agent 2**: Nutritionist with cultural meal recommendations and calorie estimation tools.
-- **Agent 3**: MCP tool agent for BMI calculation and reminder scheduling.
-
-To run the agents, install the Claude SDK and set `ANTHROPIC_API_KEY`:
-
-```bash
-pip install anthropic
-```
