@@ -5,7 +5,8 @@ Hi ![](https://user-images.githubusercontent.com/18350557/176309783-0785949b-912
 Student International in Universiti Teknologi Malaysia
 ------------------------------------------------------
 
-I am student second year in computor science software engineering in Universiti Teknologi Malaysia, I am a man who've been study about correlation between computer and human, project manager, and undergraduate student. do the hard things!
+I am student in computor science software engineering in Universiti Teknologi Malaysia, I am a man who've been study about correlation between computer and human, project manager, and undergraduate student. do the hard things with AI agents!
+I am also passionate about AI agents, i have been created multi orchrestation agent using adk ( google adk ) for my personal finance. right now i will develop project with using AI agents in the system.
 
 * 🌍  I'm based in Johor
 * 🖥️  See my portfolio at [UTM-E-Portofolio](http://https://github.com/Garskut/UTM-E-PORTOFOLIO#utm-e-portofolio)
