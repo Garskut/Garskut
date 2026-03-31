@@ -270,6 +270,23 @@ class PersonalTrainerTools:
 
 def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
     tools = PersonalTrainerTools()
+    calorie_target_tool = ToolSpec(
+        name="estimate_daily_calorie_target",
+        description="Estimate daily calorie target using weight, height, age, activity, and goal.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "weight_kg": {"type": "number"},
+                "height_cm": {"type": "number"},
+                "age": {"type": "integer"},
+                "sex": {"type": "string"},
+                "activity_level": {"type": "string"},
+                "goal": {"type": "string"},
+            },
+            "required": ["weight_kg", "height_cm", "age"],
+        },
+        handler=tools.estimate_daily_calorie_target,
+    )
 
     trainer_tools = ToolRegistry(
         [
@@ -329,23 +346,7 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
                 },
                 handler=tools.estimate_meal_calories,
             ),
-            ToolSpec(
-                name="estimate_daily_calorie_target",
-                description="Estimate daily calorie target using weight, height, age, activity, and goal.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "weight_kg": {"type": "number"},
-                        "height_cm": {"type": "number"},
-                        "age": {"type": "integer"},
-                        "sex": {"type": "string"},
-                        "activity_level": {"type": "string"},
-                        "goal": {"type": "string"},
-                    },
-                    "required": ["weight_kg", "height_cm", "age"],
-                },
-                handler=tools.estimate_daily_calorie_target,
-            ),
+            calorie_target_tool,
             ToolSpec(
                 name="recommend_cultural_meals",
                 description="Recommend meals based on customer country and goal.",
@@ -392,23 +393,7 @@ def build_personal_trainer_agents() -> Dict[str, ClaudeSDKAgent]:
                 },
                 handler=tools.schedule_workout_reminder,
             ),
-            ToolSpec(
-                name="estimate_daily_calorie_target",
-                description="Estimate daily calorie target to help set goals.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "weight_kg": {"type": "number"},
-                        "height_cm": {"type": "number"},
-                        "age": {"type": "integer"},
-                        "sex": {"type": "string"},
-                        "activity_level": {"type": "string"},
-                        "goal": {"type": "string"},
-                    },
-                    "required": ["weight_kg", "height_cm", "age"],
-                },
-                handler=tools.estimate_daily_calorie_target,
-            ),
+            calorie_target_tool,
         ]
     )
 
